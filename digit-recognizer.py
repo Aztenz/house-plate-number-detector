@@ -46,7 +46,7 @@ def normalize_image(img):
     return normalizedResult
 
 
-def ExtractFeatures(img):
+def extract_features(img):
     # Create a SIFT object for feature extraction
     sift = cv2.SIFT_create()
 
@@ -71,8 +71,8 @@ def match_features(img1, img2, v=False):
         brute_force_matcher = cv2.BFMatcher()
 
         # Extract features (key points and descriptors) from both images
-        key_points_1, descriptors1 = ExtractFeatures(img1)
-        key_points_2, descriptors2 = ExtractFeatures(img2)
+        key_points_1, descriptors1 = extract_features(img1)
+        key_points_2, descriptors2 = extract_features(img2)
 
         # Perform matching of descriptors between the two images
         matches = brute_force_matcher.knnMatch(descriptors1, descriptors2, k=2)
