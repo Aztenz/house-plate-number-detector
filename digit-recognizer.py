@@ -113,7 +113,7 @@ def testImages(v=False):
     dataSet = loadDataSet('training.json')
     print("DataSet File Loaded!!\n")
     accuracy = []
-    dir = "localizedImages"
+    dir = "localized-images"
     allFiles = os.listdir(dir)
     total = len(allFiles)
     i = 0
