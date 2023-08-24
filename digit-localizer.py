@@ -5,13 +5,11 @@ import os
 import json
 import numpy as np
 import copy
-from numpy import asarray
-from PIL import ImageEnhance, Image
 
 HarshAccuracy = False
 
 
-def loadDataSet(file_path: str):
+def load_dataset(file_path: str):
     # Open the file in read-only mode
     f = open(file_path, 'r')
     # Load the contents of the file as JSON data
@@ -20,76 +18,7 @@ def loadDataSet(file_path: str):
     return data
 
 
-def EdgeDetection(imagePath, Canny):
-    # Load the image from the file
-    img = cv2.imread(imagePath)
-    # Apply fast non-local means de-noising to the image
-    dst = cv2.fastNlMeansDenoisingColored(img, None, 10, 10, 7, 21)
-    # Convert the de-noised image to grayscale
-    gray = cv2.cvtColor(dst, cv2.COLOR_BGR2GRAY)
-
-    # Define various edge detection filters as numpy arrays
-    sobel_filter_vertical = np.array([[-1, 0, +1],
-                                      [-2, 0, +2],
-                                      [-1, 0, +1]])
-    sobel_filter_horizontal = np.array([[1, 2, +1],
-                                        [0, 0, 0],
-                                        [-1, -2, -1]])
-    laplacian_filter = np.array([[0, 1, 0],
-                                 [1, -4, 1],
-                                 [0, 1, 0]])
-    laplacian_filter_strong = np.array([[-1, -1, -1],
-                                        [-1, 8, -1],
-                                        [-1, -1, -1]])
-    hbf = np.array([[0, -1, 0],
-                    [-1, 5, -1],
-                    [0, -1, 0]])
-    shbf = np.array([[-1, -1, -1],
-                     [-1, 9, -1],
-                     [-1, -1, -1]])
-    prewitt_horizontal = np.array([[-1, 0, 1],
-                                   [-1, 0, 1],
-                                   [-1, 0, 1]])
-    prewitt_vertical = np.array([[-1, -1, -1],
-                                 [0, 0, 0],
-                                 [1, 1, 1]])
-    scharr = np.array([[-3, 0, 3],
-                       [-10, 0, 10],
-                       [-3, 0, 3]])
-    if Canny:
-        # Apply the Canny edge detection algorithm
-        sharp_image_opt = cv2.filter2D(gray, -1, sobel_filter_horizontal)
-        sharp_image_opt = cv2.filter2D(sharp_image_opt, -1, sobel_filter_vertical)
-        sharp_image_opt = cv2.filter2D(gray, -1, prewitt_horizontal)
-        sharp_image_opt = cv2.filter2D(sharp_image_opt, -1, prewitt_vertical)
-        sharp_image_opt = cv2.filter2D(sharp_image_opt, -1, laplacian_filter_strong)
-        sharp_image_opt = Image.fromarray(sharp_image_opt)
-        enhancer = ImageEnhance.Contrast(sharp_image_opt)
-        factor = 3
-        sharp_image_opt = enhancer.enhance(factor)
-        sharp_image_opt = asarray(sharp_image_opt)
-        sharp_image_opt = cv2.Canny(gray, 50, 100)
-
-    else:
-        # Apply a series of filters for edge detection
-        sharp_image_opt = cv2.filter2D(gray, -1, prewitt_horizontal)
-        sharp_image_opt = cv2.filter2D(gray, -1, prewitt_vertical)
-        sharp_image_opt = cv2.filter2D(gray, -1, laplacian_filter_strong)
-        sharp_image_opt = Image.fromarray(sharp_image_opt)
-        enhancer = ImageEnhance.Contrast(sharp_image_opt)
-        factor = 3
-        sharp_image_opt = enhancer.enhance(factor)
-        sharp_image_opt = asarray(sharp_image_opt)
-        sharp_image_opt = cv2.filter2D(gray, -1, scharr)
-        sharp_image_opt = cv2.filter2D(gray, -1, shbf)
-
-    # Display the resulting image with edges highlighted
-    cv2.imshow('Edge Detection', sharp_image_opt)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-
-def Estimate_digit_area(image_size):
+def estimate_digit_area(image_size):
     # Estimate the maximum and minimum sizes of the digits based on the image size
     max_digit_height = int(image_size[0] * 0.8)  # assume maximum digit height is 80% of the image height
     aspect_ratio = [0.38, 0.51, 0.54, 0.53, 0.55, 0.58, 0.53, 0.47, 0.57, 0.52]  # aspect ratio of digits 0-9
@@ -107,92 +36,7 @@ def Estimate_digit_area(image_size):
     return min_digit_area, max_digit_area
 
 
-def ROI_MSER(imagePath, automated):
-    # Reads the image from the specified path
-    img = cv2.imread(imagePath)
-
-    # If automated is True, calculates the approximate region of interest (ROI)
-    if automated:
-        # Converts the image to grayscale and applies Canny edge detection
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        sharp_image_opt = cv2.Canny(gray, 50, 100)
-
-        # Calculates the minimum and maximum pixel intensity values and their corresponding locations
-        (minvalue, maxvalue, minLoc, maxLoc) = cv2.minMaxLoc(sharp_image_opt)
-
-        # Obtains the image dimensions
-        height = img.shape[0]
-        width = img.shape[1]
-        channels = img.shape[2]
-
-        # Calculates the starting and ending points for the bounding rectangles for the ROI
-        startPointMax = ((maxLoc[0] + minLoc[0]) / 2, (maxLoc[1] + minLoc[1]) / 2)
-        startPointMax2 = ((maxLoc[0] / 2 + minLoc[0]) / 2, (maxLoc[1] / 2 + minLoc[1]) / 2)
-        startPointMin = ((minLoc[0] * maxLoc[0]) / 2, (minLoc[1] * maxLoc[1]) / 2)
-        endPointMax = (startPointMax[0] + width / 3, startPointMax[1] + height)
-        endPointMax2 = (startPointMax2[0] + width / 2, startPointMax2[1] + height)
-        endPointMin = (startPointMin[0] + width / 3, startPointMin[1] + height)
-
-        # Specifies the colors for the bounding rectangles
-        colourMax = (0, 0, 0)
-        colourMax2 = (0, 0, 255)
-        colourMin = (255, 0, 0)
-
-        # Draws the bounding rectangles on the original image
-        blueRect = cv2.rectangle(img, (int(startPointMin[0]), int(startPointMin[1])),
-                                 (int(endPointMin[0]), int(endPointMin[1])), colourMin, 2)
-        blueArea = (int(startPointMin[0]), int(startPointMin[1]), int(endPointMin[0]), int(endPointMin[1]))
-
-        blackRect = cv2.rectangle(img, (int(startPointMax[0]), int(startPointMax[1])),
-                                  (int(endPointMax[0]), int(endPointMax[1])), colourMax, 2)
-        redRect = cv2.rectangle(img, (int(startPointMax2[0]), int(startPointMax2[1])),
-                                (int(endPointMax2[0]), int(endPointMax2[1])), colourMax2, 2)
-
-        # Displays the original image with the bounding rectangles
-        cv2.imshow("Cropped to approximate ROI", img)
-
-    # If automated is False, allows the user to select the ROI using the mouse
-    else:
-        fromCenter = False
-        rectangles = cv2.selectROI("Region Bounding Box", img, fromCenter)
-        crop = img[int(rectangles[1]):int(rectangles[1] + rectangles[3]),
-               int(rectangles[0]):int(rectangles[0] + rectangles[2])]
-
-        # Displays the selected ROI image
-        cv2.imshow("ROI Image", crop)
-
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-
-def Corners(imagePath):
-    # Read the image from the given path.
-    img = cv2.imread(imagePath)
-
-    # Convert the image to grayscale.
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Apply Canny edge detection to the grayscale image to obtain sharp edges.
-    sharp_image_opt = cv2.Canny(gray, 50, 100)
-
-    # Convert the sharp image to a float32 format.
-    gray = np.float32(sharp_image_opt)
-
-    # Apply Harris corner detection to the sharp image with a block size of 2 and a kernel size of 3.
-    # The Harris parameter k is set to 0.04.
-    dst = cv2.cornerHarris(sharp_image_opt, 2, 3, 0.04)
-
-    # Mark the detected corners in the original image by painting them red.
-    # Only corners with a threshold value above 0.01 times the maximum threshold value are marked.
-    img[dst > 0.01 * dst.max()] = [0, 0, 255]
-
-    # Display the image with detected corners in a window titled "Corners".
-    cv2.imshow('Corners', img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-
-def CannyEdge(img, showSteps=False):
+def canny_edge(img, showSteps=False):
     # Reduce noise using bilateral filter
     dst = cv2.bilateralFilter(img, 9, 75, 75)
 
@@ -224,12 +68,12 @@ def CannyEdge(img, showSteps=False):
     return thresh
 
 
-def LocalizeDigits(img):
+def localize_digits(img):
     # Find contours of the input image with external retrieval mode.
     contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # Estimate the minimum and maximum area of digit contours based on the input image size using a separate function.
-    minArea, maxArea = Estimate_digit_area(img.shape)
+    minArea, maxArea = estimate_digit_area(img.shape)
 
     # Create an empty list to store final contours.
     finalContours = []
@@ -245,7 +89,7 @@ def LocalizeDigits(img):
     return finalContours
 
 
-def getIntersectionPercentage(myOutput, realOutput):
+def get_intersection_percentage(myOutput, realOutput):
     global HarshAccuracy
 
     # Read in black.png as a grayscale image and create two copies of it.
@@ -321,45 +165,11 @@ def find_encompassing_rect(rect_list):
     return min_x, min_y, max_x - min_x, max_y - min_y
 
 
-def Crop_To_ROI(img):
-    # Convert the image to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Threshold the grayscale image using OTSU's method
-    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-    # Find the contours of the binary image
-    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # Get the bounding boxes of the contours
-    digit_boxes = [cv2.boundingRect(contour) for contour in contours]
-
-    # Threshold the grayscale image again using OTSU's method
-    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-    # Find the contours of the binary image again
-    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # Add the bounding boxes of the new contours to the existing list of digit boxes
-    digit_boxes.extend([cv2.boundingRect(contour) for contour in contours])
-
-    # Find the minimum enclosing rectangle that encompasses all of the digit boxes
-    (x, y, w, h) = find_encompassing_rect(digit_boxes)
-
-    # If the minimum enclosing rectangle has a non-zero width and height, crop the image to the rectangle
-    if w > 0 and h > 0:
-        crop = img[y:y + h, x:x + w]
-        # Display the cropped image
-        cv2.imshow("Cropped Image", crop)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-
-def LocalizeDir(dataset, showSteps):
+def localize_dir(dataset, showSteps):
     percents = []
     i = 0
     total = len(os.listdir('test-images'))
-    clearDir("localized-images")
+    clear_dir("localized-images")
     for filename in os.listdir("test-images"):
         # Display the loading progress.
         i += 1
@@ -369,9 +179,9 @@ def LocalizeDir(dataset, showSteps):
         f = os.path.join("test-images", filename)
         imgReal = cv2.imread(f)
 
-        # Call the 'LocalizeDigits' function to get the output.
-        myOutput = LocalizeDigits(
-            CannyEdge(imgReal, showSteps=showSteps))
+        # Call the 'localize_digits' function to get the output.
+        myOutput = localize_digits(
+            canny_edge(imgReal, showSteps=showSteps))
 
         # Extract the expected output from the 'dataset' parameter based on the filename.
         realOutput = []
@@ -379,7 +189,7 @@ def LocalizeDir(dataset, showSteps):
             realOutput.append((int(box['left']), int(box['top']), int(box['width']), int(box['height'])))
 
         # Calculate the intersection percentage and add it to the list.
-        percent = getIntersectionPercentage(myOutput, realOutput)
+        percent = get_intersection_percentage(myOutput, realOutput)
         percents.append(percent)
 
         # If showSteps is True, display the localized image.
@@ -394,7 +204,8 @@ def LocalizeDir(dataset, showSteps):
     # Return the list of intersection percentages.
     return percents
 
-def clearDir(dirPath):
+
+def clear_dir(dirPath):
     try:
         files = os.listdir(dirPath)
         for file in files:
@@ -406,10 +217,11 @@ def clearDir(dirPath):
         print("Couldn't Clear Path! relaunch application")
         exit()
 
-# Load the dataset from the 'training.json' file using the 'loadDataSet' function.
-dataSet = loadDataSet('training.json')
-# Call the 'LocalizeDir' function to localize digits in the test images present in the 'test-images' folder.
-percentages = LocalizeDir(dataSet, showSteps=False)
+
+# Load the dataset from the 'training.json' file using the 'load_dataset' function.
+dataSet = load_dataset('training.json')
+# Call the 'localize_dir' function to localize digits in the test images present in the 'test-images' folder.
+percentages = localize_dir(dataSet, showSteps=False)
 # Calculate accuracy by averaging all intersection percentages.
 print(f"\n\nAccuracy is: {round(sum(percentages)/len(percentages), 1)}%")
 print("Percentages:"+str(percentages))

@@ -185,5 +185,5 @@ def test_images(v=False):
     return sum(accuracy) / len(accuracy)
 
 
-acc = test_images(False)
+acc = test_images(v=False)
 print(f"\n\nAccuracy: {round(acc * 100, 1)}%")
