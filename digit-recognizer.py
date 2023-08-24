@@ -147,26 +147,31 @@ def test_images(v=False):
 
         for idx_box, box in enumerate(boxes):
             # Extract the region of interest (ROI) from the normalized image
-            (x, y, w, h) = int(box['left']), int(box['top']), int(box['width']), int(box['height'])
+            (x, y, w, h) = int(box['left']), int(
+                box['top']), int(box['width']), int(box['height'])
             normalized_roi = normalized_image[y:y+h, x:x+w]
 
             # Calculate similarities for all digit templates
             similarities = []
             for digit_template in digit_templates:
                 desired_height = h
-                aspect_ratio = digit_template.shape[1] / digit_template.shape[0]
+                aspect_ratio = digit_template.shape[1] / \
+                    digit_template.shape[0]
                 desired_width = int(desired_height * aspect_ratio)
-                resized_template = cv2.resize(digit_template, (desired_width, desired_height))
+                resized_template = cv2.resize(
+                    digit_template, (desired_width, desired_height))
                 sim = match_features(resized_template, normalized_roi, v)
                 similarities.append(sim)
 
             # Find the best match and get the corresponding digit
             best_match_idx = similarities.index(min(similarities))
-            predicted_digit = os.listdir("digit-templates")[best_match_idx].split(".")[0]
+            predicted_digit = os.listdir(
+                "digit-templates")[best_match_idx].split(".")[0]
 
             if v:
                 # Display the predicted digit on the ROI image (if enabled)
-                image = cv2.cvtColor(image_real[y:y+h, x:x+w], cv2.COLOR_BGR2RGB)
+                image = cv2.cvtColor(
+                    image_real[y:y+h, x:x+w], cv2.COLOR_BGR2RGB)
                 aspect_ratio = image.shape[1] / image.shape[0]
                 image = cv2.resize(image, (int(500 * aspect_ratio), 500))
                 image = cv2.putText(image, predicted_digit, (image.shape[1] // 2, image.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX,
