@@ -383,12 +383,11 @@ def LocalizeDir(dataset, showSteps):
         percents.append(percent)
 
         # If showSteps is True, display the localized image.
+        for (x, y, w, h) in myOutput:
+            cv2.rectangle(imgReal, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        _ = cv2.imwrite("localized-images/"+filename, imgReal)
         if showSteps:
-            for (x, y, w, h) in myOutput:
-                cv2.rectangle(imgReal, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
             cv2.imshow('Localized', imgReal)
-            _ = cv2.imwrite("localized-images/"+filename, imgReal)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
@@ -410,7 +409,7 @@ def clearDir(dirPath):
 # Load the dataset from the 'training.json' file using the 'loadDataSet' function.
 dataSet = loadDataSet('training.json')
 # Call the 'LocalizeDir' function to localize digits in the test images present in the 'test-images' folder.
-percentages = LocalizeDir(dataSet, showSteps=True)
+percentages = LocalizeDir(dataSet, showSteps=False)
 # Calculate accuracy by averaging all intersection percentages.
 print(f"\n\nAccuracy is: {round(sum(percentages)/len(percentages), 1)}%")
 print("Percentages:"+str(percentages))
