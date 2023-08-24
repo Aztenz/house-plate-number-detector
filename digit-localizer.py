@@ -358,15 +358,15 @@ def Crop_To_ROI(img):
 def LocalizeDir(dataset, showSteps):
     percents = []
     i = 0
-    total = len(os.listdir('testImages'))
-    clearDir("localizedImages")
-    for filename in os.listdir("testImages"):
+    total = len(os.listdir('test-images'))
+    clearDir("localized-images")
+    for filename in os.listdir("test-images"):
         # Display the loading progress.
         i += 1
         loadPercent = (i/total)*100
         sys.stdout.write(f"\rLoading: [{'=' * math.floor(loadPercent/10)}{' ' * (10 - math.floor(loadPercent/10))}] "
                          f"{round(loadPercent, 1)}%")
-        f = os.path.join("testImages", filename)
+        f = os.path.join("test-images", filename)
         imgReal = cv2.imread(f)
 
         # Call the 'LocalizeDigits' function to get the output.
@@ -388,7 +388,7 @@ def LocalizeDir(dataset, showSteps):
                 cv2.rectangle(imgReal, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
             cv2.imshow('Localized', imgReal)
-            _ = cv2.imwrite("localizedImages/localized"+filename, imgReal)
+            _ = cv2.imwrite("localized-images/localized"+filename, imgReal)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
@@ -409,7 +409,7 @@ def clearDir(dirPath):
 
 # Load the dataset from the 'training.json' file using the 'loadDataSet' function.
 dataSet = loadDataSet('training.json')
-# Call the 'LocalizeDir' function to localize digits in the test images present in the 'testImages' folder.
+# Call the 'LocalizeDir' function to localize digits in the test images present in the 'test-images' folder.
 percentages = LocalizeDir(dataSet, showSteps=True)
 # Calculate accuracy by averaging all intersection percentages.
 print(f"\n\nAccuracy is: {round(sum(percentages)/len(percentages), 1)}%")
