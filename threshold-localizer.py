@@ -142,13 +142,13 @@ def LocalizeDir(dataset, thresholdType, optimize, showSteps):
         return
     percents = []
     i = 0
-    total = len(os.listdir('testImages'))
-    for filename in os.listdir("testImages"):
+    total = len(os.listdir('test-images'))
+    for filename in os.listdir("test-images"):
         i += 1
         loadPercent = (i / total) * 100
         sys.stdout.write(f"\rLoading: [{'=' * math.floor(loadPercent / 10)}{' ' * (10 - math.ceil(loadPercent / 10))}] "
                          f"{round(loadPercent, 1)}%")
-        f = os.path.join("testImages", filename)
+        f = os.path.join("test-images", filename)
         imgReal = cv2.imread(f)
 
         myOutputBin = LocalizeDigits(
@@ -208,5 +208,5 @@ def LocalizeDir(dataset, thresholdType, optimize, showSteps):
 
 
 dataSet = loadDataSet('training.json')
-percentages = LocalizeDir(dataSet, 'adaptiveMean', optimize=False, showSteps=False)
+percentages = LocalizeDir(dataSet, 'adaptiveMean', optimize=False, showSteps=True)
 print(f"\n\nAccuracy is: {round(sum(percentages)/len(percentages), 1)}%")

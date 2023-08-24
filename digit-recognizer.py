@@ -113,7 +113,7 @@ def testImages(v=False):
     dataSet = loadDataSet('training.json')
     print("DataSet File Loaded!!\n")
     accuracy = []
-    dir = "localized-images"
+    dir = "test-images"
     allFiles = os.listdir(dir)
     total = len(allFiles)
     i = 0
@@ -140,9 +140,9 @@ def testImages(v=False):
             label = str(box['label']).split(".")[0]
             digit = ""
             score = math.inf
-            for idx, digitFilename in enumerate(os.listdir("digitTemplates")):
+            for idx, digitFilename in enumerate(os.listdir("digit-templates")):
                 # Load the digit template image
-                template = os.path.join("digitTemplates", digitFilename)
+                template = os.path.join("digit-templates", digitFilename)
                 digitTemplate = cv2.imread(template)
 
                 # Resize the digit template to match the size of the ROI
@@ -179,5 +179,5 @@ def testImages(v=False):
     return sum(accuracy)/len(accuracy)
 
 
-acc = testImages(True)
+acc = testImages(False)
 print(f"\n\nAccuracy: {round(acc * 100, 1)}%")

@@ -388,7 +388,7 @@ def LocalizeDir(dataset, showSteps):
                 cv2.rectangle(imgReal, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
             cv2.imshow('Localized', imgReal)
-            _ = cv2.imwrite("localized-images/localized"+filename, imgReal)
+            _ = cv2.imwrite("localized-images/"+filename, imgReal)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
