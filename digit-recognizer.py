@@ -6,7 +6,7 @@ import numpy as np
 import json
 
 
-def loadDataSet(file_path: str):
+def load_dataset(file_path: str):
     # Open the file in read-only mode
     f = open(file_path, 'r')
     # Load the contents of the file as JSON data
@@ -15,7 +15,7 @@ def loadDataSet(file_path: str):
     return list(data)
 
 
-def NormalizeImage(img):
+def normalize_image(img):
     # Convert the image to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -65,33 +65,40 @@ def ExtractFeatures(img):
     return keyPoints, descriptors
 
 
-def MatchFeatures(img1, img2, v=False):
+def match_features(img1, img2, v=False):
     try:
         # Create a brute-force matcher
-        bruteForceMatcher = cv2.BFMatcher()
+        brute_force_matcher = cv2.BFMatcher()
 
         # Extract features (key points and descriptors) from both images
-        keyPoints1, descriptors1 = ExtractFeatures(img1)
-        keyPoints2, descriptors2 = ExtractFeatures(img2)
+        key_points_1, descriptors1 = ExtractFeatures(img1)
+        key_points_2, descriptors2 = ExtractFeatures(img2)
 
         # Perform matching of descriptors between the two images
-        matches = bruteForceMatcher.knnMatch(descriptors1, descriptors2, k=2)
+        matches = brute_force_matcher.knnMatch(descriptors1, descriptors2, k=2)
 
         # Perform ratio test to filter out ambiguous matches
-        optimizedMatches = []
-        for firstImageMatch, secondImageMatch in matches:
-            if firstImageMatch.distance < 1 * secondImageMatch.distance:
-                optimizedMatches.append(firstImageMatch)
+        optimizedMatches = [firstImageMatch for firstImageMatch, secondImageMatch in matches
+                            if firstImageMatch.distance < 0.75 * secondImageMatch.distance]
 
-        # Compute similarity scores based on match distances
-        similarity_scores = [match.distance for match in optimizedMatches]
-        max_distance = max(similarity_scores)
-        min_distance = min(similarity_scores)
-        normalized_scores = [(max_distance - score) / ((max_distance - min_distance) + 0.0000001) for score in
-                             similarity_scores]
+        # Compute normalized scores and similarity sum
+        similarity_sum = 0.0
+        max_distance = float('-inf')
+        min_distance = float('inf')
+        for match in optimizedMatches:
+            distance = match.distance
+            similarity_sum += distance
+            if distance > max_distance:
+                max_distance = distance
+            if distance < min_distance:
+                min_distance = distance
+
+        # Compute the average normalized score as a measure of similarity
+        normalized_scores = [(max_distance - score) / (max_distance - min_distance + 0.0000001) for score in
+                             (match.distance for match in optimizedMatches)]
 
         # Draw the matched key points on the image (if enabled)
-        matched_image = cv2.drawMatches(img1, keyPoints1, img2, keyPoints2, optimizedMatches, None,
+        matched_image = cv2.drawMatches(img1, key_points_1, img2, key_points_2, optimizedMatches, None,
                                         flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
         if v:
@@ -100,84 +107,83 @@ def MatchFeatures(img1, img2, v=False):
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
-        # Compute the average normalized score as a measure of similarity
-        return sum(normalized_scores) / len(normalized_scores)
+        return similarity_sum / len(normalized_scores) if normalized_scores else 0.0
     except:
         # Return infinity if an exception occurs during the process
         return math.inf
 
 
-def testImages(v=False):
+def test_images(v=False):
     # Load the dataset file
     print("Loading DataSet File..")
-    dataSet = loadDataSet('training.json')
+    data_set = load_dataset('training.json')
     print("DataSet File Loaded!!\n")
     accuracy = []
-    dir = "test-images"
-    allFiles = os.listdir(dir)
-    total = len(allFiles)
-    i = 0
-    for filename in allFiles:
-        i += 1
-        loadPercent = (i / total) * 100
+
+    # Preprocess digit templates
+    digit_templates = []
+    for digit_filename in os.listdir("digit-templates"):
+        template = os.path.join("digit-templates", digit_filename)
+        digit_template = cv2.imread(template)
+        digit_templates.append(digit_template)
+
+    directory = "test-images"
+    all_files = os.listdir(directory)
+    total = len(all_files)
+
+    for i, filename in enumerate(all_files, start=1):
+        load_percent = (i / total) * 100
         if not v:
             sys.stdout.write(
-                f"\rComputing Accuracy: [{'=' * math.floor(loadPercent / 10)}{' ' * (10 - math.floor(loadPercent / 10))}]"
-                f"{round(loadPercent, 1)}%")
+                f"\rComputing Accuracy: [{'=' * math.floor(load_percent / 10)}{' ' * (10 - math.floor(load_percent / 10))}]"
+                f"{round(load_percent, 1)}%")
 
         # Read the real image
-        imgReal = cv2.imread(dir+"/"+filename)
+        image_real = cv2.imread(os.path.join(directory, filename))
         # Get the bounding boxes for the current image
-        boxes = dataSet[int(filename.split(".")[0]) - 1]['boxes']
+        boxes = data_set[int(filename.split(".")[0]) - 1]['boxes']
         # Normalize the real image
-        normalizedImage = NormalizeImage(imgReal)
+        normalized_image = normalize_image(image_real)
 
-        for idxBox, box in enumerate(boxes):
-            # Extract the region of interest (ROI) from the real image based on the bounding box
+        for idx_box, box in enumerate(boxes):
+            # Extract the region of interest (ROI) from the normalized image
             (x, y, w, h) = int(box['left']), int(box['top']), int(box['width']), int(box['height'])
-            img = imgReal[y:y+h, x:x+w]
-            # Extract the label and initialize the predicted digit
-            label = str(box['label']).split(".")[0]
-            digit = ""
-            score = math.inf
-            for idx, digitFilename in enumerate(os.listdir("digit-templates")):
-                # Load the digit template image
-                template = os.path.join("digit-templates", digitFilename)
-                digitTemplate = cv2.imread(template)
+            normalized_roi = normalized_image[y:y+h, x:x+w]
 
-                # Resize the digit template to match the size of the ROI
-                desired_height = img.shape[0]
-                aspect_ratio = digitTemplate.shape[1] / digitTemplate.shape[0]
+            # Calculate similarities for all digit templates
+            similarities = []
+            for digit_template in digit_templates:
+                desired_height = h
+                aspect_ratio = digit_template.shape[1] / digit_template.shape[0]
                 desired_width = int(desired_height * aspect_ratio)
-                resized_image = cv2.resize(digitTemplate, (desired_width, desired_height))
+                resized_template = cv2.resize(digit_template, (desired_width, desired_height))
+                sim = match_features(resized_template, normalized_roi, v)
+                similarities.append(sim)
 
-                # Match features between the resized digit template and the normalized ROI
-                sim = MatchFeatures(resized_image, normalizedImage[y:y+h, x:x+w], v)
-                if sim < score:
-                    # Update the predicted digit if a better match is found
-                    score = sim
-                    digit = digitFilename.split(".")[0]
+            # Find the best match and get the corresponding digit
+            best_match_idx = similarities.index(min(similarities))
+            predicted_digit = os.listdir("digit-templates")[best_match_idx].split(".")[0]
 
             if v:
                 # Display the predicted digit on the ROI image (if enabled)
-                image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                image = cv2.cvtColor(image_real[y:y+h, x:x+w], cv2.COLOR_BGR2RGB)
                 aspect_ratio = image.shape[1] / image.shape[0]
                 image = cv2.resize(image, (int(500 * aspect_ratio), 500))
-                image = cv2.putText(image, digit, (image.shape[1] // 2, image.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX,
+                image = cv2.putText(image, predicted_digit, (image.shape[1] // 2, image.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX,
                                     3, (0, 255, 0), 5, cv2.LINE_AA)
                 cv2.imshow('Digit', image)
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
-                print(f"\nImage {filename.split('.')[0]}, Box:{idxBox}: Label = {label},"
-                      f" Predicted Outcome = {digit}")
+                print(f"\nImage {filename.split('.')[0]}, Box:{idx_box}: Label = {box['label']},"
+                      f" Predicted Outcome = {predicted_digit}")
 
             # Compute the accuracy by comparing the predicted digit with the label
-            accuracy.append(digit == label)
+            accuracy.append(predicted_digit == str(box['label']).split(".")[0])
 
     if not v:
         sys.stdout.write(f"\rComputing Accuracy: [{'=' * 10}] 100%")
-    return sum(accuracy)/len(accuracy)
+    return sum(accuracy) / len(accuracy)
 
 
-acc = testImages(False)
+acc = test_images(False)
 print(f"\n\nAccuracy: {round(acc * 100, 1)}%")
