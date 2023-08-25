@@ -2,8 +2,6 @@
 
 This repository contains Python scripts for detecting and recognizing house plate numbers in images. The project aims to utilize computer vision techniques to localize and recognize license plate numbers within images.
 
-![License Plate Detection Example](images/license_plate_detection_example.png)
-
 ## Features
 
 - License plate detection using OpenCV and contour analysis.
@@ -34,10 +32,10 @@ This repository contains Python scripts for detecting and recognizing house plat
 2. Run the license plate localizer script:
    ```bash
    python digit-localizer.py
-
-Localized images will appear in localized-images directory
+   ```
+   Localized images will appear in localized-images directory
 3. Run the license plate digit reconition script:
    ```bash
    python digit-recognizer.py
-
-The output will be clearly visible in your terminal    
+   ```
+   The output will be clearly visible in your terminal
