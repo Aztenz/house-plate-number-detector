@@ -226,7 +226,7 @@ def clear_dir(dirPath):
 # Load the dataset from the 'training.json' file using the 'load_dataset' function.
 dataSet = load_dataset('training.json')
 # Call the 'localize_dir' function to localize digits in the test images present in the 'test-images' folder.
-percentages = localize_dir(dataSet, showSteps=False)
+percentages = localize_dir(dataSet, showSteps=True)
 # Calculate accuracy by averaging all intersection percentages.
 print(f"\n\nAccuracy is: {round(sum(percentages)/len(percentages), 1)}%")
 print("Percentages:"+str(percentages))

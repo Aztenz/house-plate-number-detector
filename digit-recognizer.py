@@ -15,6 +15,13 @@ def load_dataset(file_path: str):
     return list(data)
 
 
+def preprocess_template(template):
+    gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+    blurred_template = cv2.GaussianBlur(gray_template, (5, 5), 0)
+    _, binarized_template = cv2.threshold(blurred_template, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    return binarized_template
+
+
 def normalize_image(img):
     # Convert the image to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -65,67 +72,61 @@ def extract_features(img):
     return keyPoints, descriptors
 
 
-def match_features(img1, img2, v=False):
-    try:
-        # Create a brute-force matcher
-        brute_force_matcher = cv2.BFMatcher()
+def match_template(normalized_roi, template):
+    roi_height, roi_width = normalized_roi.shape[:2]
+    template_height, template_width = template.shape[:2]
+    result_height = roi_height - template_height + 1
+    result_width = roi_width - template_width + 1
 
-        # Extract features (key points and descriptors) from both images
-        key_points_1, descriptors1 = extract_features(img1)
-        key_points_2, descriptors2 = extract_features(img2)
+    # Calculate the normalized template
+    template_mean = np.mean(template)
+    template_normalized = template - template_mean
+    template_norm = np.linalg.norm(template_normalized)
 
-        # Perform matching of descriptors between the two images
-        matches = brute_force_matcher.knnMatch(descriptors1, descriptors2, k=2)
+    # Initialize the result array
+    result = np.zeros((result_height, result_width), dtype=np.float32)
 
-        # Perform ratio test to filter out ambiguous matches
-        optimizedMatches = [firstImageMatch for firstImageMatch, secondImageMatch in matches
-                            if firstImageMatch.distance < 0.75 * secondImageMatch.distance]
+    # Perform template matching using FFT-based convolution
+    for y in range(result_height):
+        for x in range(result_width):
+            roi_patch = normalized_roi[y:y + template_height, x:x + template_width]
+            roi_patch_mean = np.mean(roi_patch)
+            roi_patch_normalized = roi_patch - roi_patch_mean
+            roi_patch_norm = np.linalg.norm(roi_patch_normalized)
 
-        # Compute normalized scores and similarity sum
-        similarity_sum = 0.0
-        max_distance = float('-inf')
-        min_distance = float('inf')
-        for match in optimizedMatches:
-            distance = match.distance
-            similarity_sum += distance
-            if distance > max_distance:
-                max_distance = distance
-            if distance < min_distance:
-                min_distance = distance
+            correlation = np.sum(roi_patch_normalized * template_normalized)
+            correlation /= (roi_patch_norm * template_norm)
 
-        # Compute the average normalized score as a measure of similarity
-        normalized_scores = [(max_distance - score) / (max_distance - min_distance + 0.0000001) for score in
-                             (match.distance for match in optimizedMatches)]
+            result[y, x] = correlation
 
-        # Draw the matched key points on the image (if enabled)
-        matched_image = cv2.drawMatches(img1, key_points_1, img2, key_points_2, optimizedMatches, None,
-                                        flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    return result
 
-        if v:
-            # Display the matched image (if enabled)
-            cv2.imshow('Digit', matched_image)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
 
-        return similarity_sum / len(normalized_scores) if normalized_scores else 0.0
-    except:
-        # Return infinity if an exception occurs during the process
-        return math.inf
+def match_features(template, normalized_roi, v=False):
+    result = match_template(normalized_roi, template)
+    _, max_val, _, max_loc = cv2.minMaxLoc(result)
+    
+    if v:
+        h, w = template.shape
+        matched_image = normalized_roi.copy()
+        cv2.rectangle(matched_image, max_loc, (max_loc[0] + w, max_loc[1] + h), 255, 2)
+        cv2.imshow('Matching Result', matched_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    return max_val
 
 
 def test_images(v=False):
-    # Load the dataset file
-    print("Loading DataSet File..")
     data_set = load_dataset('training.json')
-    print("DataSet File Loaded!!\n")
     accuracy = []
 
-    # Preprocess digit templates
     digit_templates = []
     for digit_filename in os.listdir("digit-templates"):
-        template = os.path.join("digit-templates", digit_filename)
-        digit_template = cv2.imread(template)
-        digit_templates.append(digit_template)
+        template_path = os.path.join("digit-templates", digit_filename)
+        template = cv2.imread(template_path)
+        preprocessed_template = preprocess_template(template)
+        digit_templates.append(preprocessed_template)
 
     directory = "test-images"
     all_files = os.listdir(directory)
@@ -138,51 +139,26 @@ def test_images(v=False):
                 f"\rComputing Accuracy: [{'=' * math.floor(load_percent / 10)}{' ' * (10 - math.floor(load_percent / 10))}]"
                 f"{round(load_percent, 1)}%")
 
-        # Read the real image
         image_real = cv2.imread(os.path.join(directory, filename))
-        # Get the bounding boxes for the current image
         boxes = data_set[int(filename.split(".")[0]) - 1]['boxes']
-        # Normalize the real image
         normalized_image = normalize_image(image_real)
 
         for idx_box, box in enumerate(boxes):
-            # Extract the region of interest (ROI) from the normalized image
-            (x, y, w, h) = int(box['left']), int(
-                box['top']), int(box['width']), int(box['height'])
+            (x, y, w, h) = int(box['left']), int(box['top']), int(box['width']), int(box['height'])
             normalized_roi = normalized_image[y:y+h, x:x+w]
 
-            # Calculate similarities for all digit templates
             similarities = []
             for digit_template in digit_templates:
                 desired_height = h
-                aspect_ratio = digit_template.shape[1] / \
-                    digit_template.shape[0]
+                aspect_ratio = digit_template.shape[1] / digit_template.shape[0]
                 desired_width = int(desired_height * aspect_ratio)
-                resized_template = cv2.resize(
-                    digit_template, (desired_width, desired_height))
+                resized_template = cv2.resize(digit_template, (desired_width, desired_height))
                 sim = match_features(resized_template, normalized_roi, v)
                 similarities.append(sim)
 
-            # Find the best match and get the corresponding digit
-            best_match_idx = similarities.index(min(similarities))
-            predicted_digit = os.listdir(
-                "digit-templates")[best_match_idx].split(".")[0]
+            best_match_idx = similarities.index(max(similarities))
+            predicted_digit = os.listdir("digit-templates")[best_match_idx].split(".")[0]
 
-            if v:
-                # Display the predicted digit on the ROI image (if enabled)
-                image = cv2.cvtColor(
-                    image_real[y:y+h, x:x+w], cv2.COLOR_BGR2RGB)
-                aspect_ratio = image.shape[1] / image.shape[0]
-                image = cv2.resize(image, (int(500 * aspect_ratio), 500))
-                image = cv2.putText(image, predicted_digit, (image.shape[1] // 2, image.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX,
-                                    3, (0, 255, 0), 5, cv2.LINE_AA)
-                cv2.imshow('Digit', image)
-                cv2.waitKey(0)
-                cv2.destroyAllWindows()
-                print(f"\nImage {filename.split('.')[0]}, Box:{idx_box}: Label = {box['label']},"
-                      f" Predicted Outcome = {predicted_digit}")
-
-            # Compute the accuracy by comparing the predicted digit with the label
             accuracy.append(predicted_digit == str(box['label']).split(".")[0])
 
     if not v:
